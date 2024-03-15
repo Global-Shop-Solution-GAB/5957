@@ -1,0 +1,287 @@
+Program.Sub.Preflight.Start
+V.Global.sRBDatabase.Declare(String,"")
+V.Global.sError.Declare(String,"")
+V.Global.sSuccess.Declare(String,"")
+V.Global.sPartial.Declare(String,"")
+Program.External.Include.Library("ORDUPL.lib")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.CallSub(ChkDir)
+F.Intrinsic.Control.CallSub(GetOrders)
+F.Intrinsic.Control.CallSub(SendEmails)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.ChkDir.Start
+F.Intrinsic.Control.Try
+V.Local.sPath.Declare
+V.Local.sDirBuild.Declare
+V.Local.bDirChk.Declare
+V.Local.sErrPath.Declare
+V.Local.sConPath.Declare
+V.Local.sUplPath.Declare
+V.Local.sFilePath.Declare
+V.Local.sRet.Declare
+
+V.Local.sPath.Set(V.Caller.FilesDir)
+
+F.Intrinsic.String.Build("{0}\WebImporter",V.Local.sPath.Trim,V.Local.sPath)
+
+F.Intrinsic.File.DirExists(V.Local.sPath,V.Local.bDirChk)
+
+F.Intrinsic.Control.If(V.Local.bDirChk,=,False)
+	F.Intrinsic.String.Build("{0}\errors",V.Local.sPath.Trim,V.Local.sErrPath)
+	F.Intrinsic.File.CreateDir(V.Local.sErrPath.Trim)
+	F.Intrinsic.String.Build("{0}\converted",V.Local.sPath.Trim,V.Local.sConPath)
+	F.Intrinsic.File.CreateDir(V.Local.sConPath.Trim)
+	F.Intrinsic.String.Build("{0}\uploaded",V.Local.sPath.Trim,V.Local.sUplPath)
+	F.Intrinsic.File.CreateDir(V.Local.sUplPath.Trim)
+	
+	F.Intrinsic.String.Build("WEB ORDER DIRECTORY   = {1}{0}WEB ERROR DIRECTORY   = {2}{0}WEB CONVERTED DIR     = {3}{0}WEB UPLOADED DIRECTORY= {4}{0}EMAIL FROM ADDRESS    ={0}EMAIL TO ADDRESS      =",V.Ambient.NewLine,V.Local.sPath.Trim,V.Local.sErrPath.Trim,V.Local.sConPath.Trim,V.Local.sUplPath.Trim,V.Local.sDirBuild)
+	
+	F.Intrinsic.String.Build("{0}\GSSPARAM{1}.txt",V.Caller.FilesDir,V.Caller.CompanyCode,V.Local.sFilePath)
+	
+	F.Intrinsic.File.String2File(V.Local.sFilePath.Trim,V.Local.sDirBuild,V.Local.sRet)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.ChkDir.End
+
+Program.Sub.GetOrders.Start
+F.Intrinsic.Control.Try
+V.Local.sConnection.Declare
+V.Local.sSQL.Declare
+V.Local.sLastOrder.Declare
+V.Local.sFilter.Declare
+V.Local.sCustNo.Declare
+V.Local.iCNT.Declare
+V.Local.sOrderDate.Declare
+V.Local.sTransId.Declare
+V.Local.sPO.Declare
+V.Local.sGSOrdNo.Declare
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+
+F.ODBC.Connection!conts.ExecuteAndReturn("Select RTRIM(RB_DATABASE),LAST_ORD_REC from GCG_5957_MAINT",V.Local.sSQL)
+F.Intrinsic.String.Split(V.Local.sSQL,"*!*",V.Local.sSQL)
+
+V.Global.sRBDatabase.Set(V.Local.sSQL(0).Trim)
+V.Local.sLastOrder.Set(V.Local.sSQL(1).Trim)
+V.Local.sSQL.Redim(0,0)
+
+F.Intrinsic.String.Build("Driver={SQL Server};Server=10.2.92.9\RBSQL;Database={0};User Id=rbviewer;Password=RBViewer",V.Global.sRBDatabase,V.Local.sConnection)
+
+F.ODBC.Connection!conSS.OpenConnection(V.Local.sConnection)
+
+'Get Order Header information
+F.Intrinsic.String.Build("Select TransactionId,DateStart as OrderDate,StoreLocation as CompanyId,'' as CustomerNo from {0}.dbo.MasterTransaction where RTRIM(Typeoftransaction) in ('S','WC')",V.Global.sRBDatabase,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtOrdHeader","conSS",V.Local.sSQL)
+
+F.Intrinsic.String.Build("Select CompanyId,Concat(CompanyId,Left(UPPER(CITY),5)) as CustomerNo from {0}.dbo.CompanyInfoMaster",V.Global.sRBDatabase.Trim,V.Local.sSQL)
+F.Data.Dictionary.CreateFromSQL("dictCust","conSS",V.Local.sSQL)
+F.Data.Dictionary.SetDefaultReturn("dictCust","")
+
+F.Data.DataTable.FillFromDictionary("dtOrdHeader","dictCust","CompanyId","CustomerNo")
+F.Data.Dictionary.Close("dictCust")
+
+F.Data.DataTable.AddExpressionColumn("dtOrdHeader","MaxOrder","String","Max(TransactionId)")
+
+F.Intrinsic.String.Build("TransactionId > {0}",V.Local.sLastOrder,V.Local.sFilter)
+
+F.Data.DataView.Create("dtOrdHeader","dvOrdHeader",22,V.Local.sFilter,"")
+
+F.Intrinsic.Control.If(V.DataView.dtOrdHeader!dvOrdHeader.RowCount,=,0)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+
+V.Local.sLastOrder.Set(V.DataTable.dtOrdHeader(0).MaxOrder!FieldvalTrim)
+
+F.Intrinsic.String.Build("Update GCG_5957_MAINT set LAST_ORD_REC = '{0}' where RB_DATABASE = '{1}'",V.Local.sLastOrder.Trim,V.Global.sRBDatabase.Trim,V.Local.sSQL)
+
+F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+
+F.Intrinsic.Control.For(V.Local.iCNT,0,V.DataView.dtOrdHeader!dvOrdHeader.RowCount--,1)
+	V.Local.sCustNo.Set(V.DataView.dtOrdHeader!dvOrdHeader(V.Local.iCNT).CustomerNo!FieldValTrim)
+	V.Local.sOrderDate.Set(V.DataView.dtOrdHeader!dvOrdHeader(V.Local.iCNT).OrderDate!FieldValTrim)
+	F.Intrinsic.String.Format(V.Local.sOrderDate,"YYYYMMDD",V.Local.sOrderDate)
+	
+	F.Intrinsic.String.Build("{0} #{1}",V.Local.sCustNo,V.DataView.dtOrdHeader!dvOrdHeader(V.Local.iCNT).TransactionId!FieldValLong,V.Local.sPO)
+	
+	F.Data.DataTable.AddRow("ORDUPL","Transaction","O","CustomerNo",V.Local.sCustNo,"OrderDate",V.Local.sOrderDate,"CustomerPO",V.Local.sPO.Trim,"Salesman","WEB")
+
+	V.Local.sTransId.Set(V.DataView.dtOrdHeader!dvOrdHeader(V.Local.iCNT).TransactionId!FieldValTrim)
+	F.Intrinsic.Control.CallSub(AddOrderLines,"CustomerNo",V.Local.sCustNo,"OrderDate",V.Local.sOrderDate,"TransId",V.Local.sTransId)
+	
+	F.Intrinsic.Control.If(V.DataTable.ORDUPLLines.RowCount,=,0)
+		F.Data.DataTable.DeleteRow("ORDUPL")
+		F.Intrinsic.String.Build("{0}{1}RB Retail order {2} from {5}{3}{5} could not be imported.{1}    Part number(s) {4} not found in Global Shop Inventory.{1}",V.Global.sError,V.Ambient.NewLine,V.Local.sTransId,V.Local.sCustNo,V.Args.PartNumErr.Trim,V.Ambient.DblQuote,V.Global.sError)
+		
+	F.Intrinsic.Control.ElseIf(V.DataTable.dtOrdLines.RowCount,<>,V.DataTable.ORDUPLLines.RowCount)
+		F.Data.DataTable.SetValue("ORDUPLLines",-1,"LineOrderDate",V.Local.sOrderDate,"LineType","S")
+				
+		F.Intrinsic.Control.CallSub(ORDUPLCreateFile)		
+		F.Intrinsic.Control.CallSub(ORDUPLSync)
+	
+		F.Intrinsic.String.Build("Select Top 1 ORDER_NO from V_ORDER_HEADER where CUSTOMER_PO = '{0}' order by Date_Order Desc",V.Local.sPO.Trim,V.Local.sSql)
+		F.ODBC.Connection!conts.ExecuteAndReturn(V.Local.sSql,V.Local.sGSOrdNo)
+		
+		F.Intrinsic.String.Build("{0}{1}RB Retail order {2} from {7}{3}{7} was partially uploaded to Global Shop as {4}.{1}{8}Sequence(s) {5} could not be uploaded,{1}{8}     Part number(s) {6} not found in Global Shop Inventory",V.Global.sPartial,V.Ambient.NewLine,V.Local.sTransId,V.Local.sCustNo.Trim,V.Local.sGSOrdNo.Trim,V.Args.LineErr.Trim,V.Args.PartNumErr.Trim,V.Ambient.DblQuote,V.Ambient.Tab,V.Global.sPartial)
+		
+	F.Intrinsic.Control.Else
+		F.Data.DataTable.SetValue("ORDUPLLines",-1,"LineOrderDate",V.Local.sOrderDate,"LineType","S")
+				
+		F.Intrinsic.Control.CallSub(ORDUPLCreateFile)		
+		F.Intrinsic.Control.CallSub(ORDUPLSync)
+		
+		F.Intrinsic.String.Build("Select Top 1 ORDER_NO from V_ORDER_HEADER where CUSTOMER_PO = '{0}' order by Date_Order Desc",V.Local.sPO.Trim,V.Local.sSql)
+		F.ODBC.Connection!conts.ExecuteAndReturn(V.Local.sSql,V.Local.sGSOrdNo)
+		
+		F.Intrinsic.String.Build("{0}{1}RB Retail order {2} from {5}{3}{5} imported to Global Shop as SO {4} ",V.Global.sSuccess,V.Ambient.NewLine,V.Local.sTransId,V.Local.sCustNo,V.Local.sGSOrdNo,V.Ambient.DblQuote,V.Global.sSuccess)
+	F.Intrinsic.Control.EndIf
+	
+F.Intrinsic.Control.Next(V.Local.iCNT)
+
+F.ODBC.Connection!conts.Close
+F.ODBC.Connection!conSS.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.GetOrders.End
+
+Program.Sub.AddOrderLines.Start
+F.Intrinsic.Control.Try
+V.Local.sSQL.Declare
+V.Local.iCNT.Declare
+V.Local.sLoc.Declare
+V.Local.sPartDesc.Declare
+V.Local.sUM.Declare
+V.Local.sTemp.Declare
+V.Local.sQTY.Declare
+V.Local.sPrice.Declare
+V.Local.sPartErr.Declare
+V.Local.sLineErr.Declare
+
+F.Intrinsic.Control.If(V.DataTable.dtOrdLines.Exists)
+	F.Data.DataTable.Close("dtOrdLines")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("Select Sequence,Quantity,PartNumber,LocationNumber,Price,'' as PartDesc,'' as UM from {0}.dbo.TransactionItems where RTRIM(TransactionId) = {1}",V.Global.sRBDatabase.Trim,V.Args.TransId.Trim,V.Local.sSQL)
+F.Data.DataTable.CreateFromSQL("dtOrdLines","conSS",V.Local.sSQL,True)
+
+F.Intrinsic.Control.For(V.Local.iCNT,0,V.DataTable.dtOrdLines.RowCount--,1)
+	F.Intrinsic.Control.SelectCase(V.DataTable.dtOrdLines(V.Local.iCNT).LocationNumber!FieldValTrim)
+		F.Intrinsic.Control.Case("1")
+			V.Local.sLoc.Set("")
+		F.Intrinsic.Control.Case("2")
+			V.Local.sLoc.Set("30")
+		F.Intrinsic.Control.Case("3")
+			V.Local.sLoc.Set("40")
+		F.Intrinsic.Control.Case("4")
+			V.Local.sLoc.Set("50")
+	F.Intrinsic.Control.EndSelect
+	
+	F.Intrinsic.String.Build("Select RTRIM(DESCRIPTION) as DESCRIPTION,RTRIM(UM_PURCHASING) as UM from V_INVENTORY_MSTR where RTRIM(PART) = '{0}' and RTRIM(LOCATION) = '{1}'",V.DataTable.dtOrdLines(V.Local.iCNT).Partnumber!FieldValTrim,V.Local.sLoc.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conts.ExecuteAndReturn(V.Local.sSQL,V.Local.sSQL)
+	
+	F.Intrinsic.Control.If(V.Local.sSQL.Trim,<>,"")
+		F.Intrinsic.String.Split(V.Local.sSQL,"*!*",V.Local.sSQL)
+		V.Local.sTemp.Set(V.Local.sSQL(0).Trim)
+
+		V.Local.sQTY.Set(V.DataTable.dtOrdLines(V.Local.iCNT).Quantity!FieldVal)
+		
+		F.Intrinsic.Math.Mult(V.Local.sQTY.Float,10000,V.Local.sQTY)
+		
+		F.Intrinsic.Math.Mult(V.Local.sPrice.Float,1000000,V.Local.sPrice)
+		
+		F.Communication.Misc.EncodeToString(3, V.Local.sTemp, V.Local.sTemp)
+		F.Intrinsic.String.Replace(V.Local.sTemp,"%ae","",V.Local.sTemp)
+        F.Intrinsic.String.Replace(V.Local.sTemp, "%99", "", V.Local.sTemp)
+        F.Intrinsic.String.Replace(V.Local.sTemp, "%a9", "", V.Local.sTemp)
+        F.Intrinsic.String.Replace(V.Local.sTemp, "%22", "in", V.Local.sTemp)
+	 	F.Communication.Misc.DecodeToString(3, V.Local.sTemp, V.Local.sPartDesc)
+	
+		F.Data.DataTable.AddRow("ORDUPLLines","LineNumber",V.DataTable.dtOrdLines(V.Local.iCNT).Sequence!FieldValTrim,"QtyOrdered",V.Local.sQTY,"PartNumber",V.DataTable.dtOrdLines(V.Local.iCNT).PartNumber!FieldValTrim,"PartLoc",V.Local.sLoc.Trim,"QuotedPrice",V.Local.sPrice,"PartDesc",V.Local.sPartDesc,"UM",V.Local.sSQL(1))
+		V.Local.sSQL.Redim(0,0)
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.Build("{0}{1},",V.Local.sPartErr,V.DataTable.dtOrdLines(V.Local.iCNT).PartNumber!FieldValTrim,V.Local.sPartErr)
+		F.Intrinsic.String.Build("{0}{1},",V.Local.sLineErr,V.DataTable.dtOrdLines(V.Local.iCNT).Sequence!FieldValTrim,V.Local.sLineErr)		
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.iCNT)
+
+F.Intrinsic.Variable.AddRV("PartNumErr",V.Local.sPartErr.Trim,"LineErr",V.Local.sLineErr.Trim)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.AddOrderLines.End
+
+Program.Sub.SendEmails.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare(String,"")
+V.Local.sBody.Declare(String,"")
+V.Local.sRecipients.Declare(String,"")
+V.Local.sSender.Declare(String,"")
+V.Local.sFile.Declare(String,"")
+V.Local.iUserID.Declare(Long,0)
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+'Successful GS order 
+F.Intrinsic.Control.If(V.Global.sSuccess.Trim,<>,"")
+	F.Intrinsic.String.Build("{0}{1}{1}The following orders were successfully imported from RB Retail to Global Shop:{1}-{2}",V.Local.sBody,V.Ambient.NewLine,V.Global.sSuccess.Trim,V.Local.sBody)
+F.Intrinsic.Control.EndIf
+'Partial order creation
+F.Intrinsic.Control.If(V.Global.sPartial.Trim,<>,"")
+	F.Intrinsic.String.Build("{0}{1}{1}The following orders were partially imported from RB Retail to Global Shop.{1}The missing lines will need to be added manually.{1}-{2}",V.Local.sBody,V.Ambient.NewLine,V.Global.sPartial.Trim,V.Local.sBody)
+F.Intrinsic.Control.EndIf
+'Orders that failed to create in GS
+F.Intrinsic.Control.If(V.Global.sError.Trim,<>,"")
+	F.Intrinsic.String.Build("{0}{1}{1}The following orders from RB Retail failed to import to Global Shop.  Please add them manually.{1}-{2}",V.Local.sBody,V.Ambient.NewLine,V.Global.sError.Trim,V.Local.sBody)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("{0}\{1}ORDSRBRETAIL.txt",V.Caller.FilesDir,V.Caller.User,V.Local.sFile)
+
+F.Intrinsic.String.Build("Hello,{0}{1}",V.Ambient.NewLine,V.Local.sBody,V.Local.sBody)
+
+F.Intrinsic.File.String2File(V.Local.sFile,V.Local.sBody)
+
+F.Data.DataTable.CreateFromSQL("dtEmails","conts","Select RTRIM(LTRIM(REC_EMAIL)) as EMAILADDR,RTRIM(LTRIM(REC_NAME)) as RECIPIENTNAME from GCG_5957_MAINT where REC_ID = 1",True)
+
+F.Intrinsic.Control.If(V.DataTable.dtEmails.RowCount,>,0)
+	V.Local.sSender.Set("mdodson@cardinalsystemsinc.com*!*Mike Dodson")
+	F.Global.Security.getuserID(V.Caller.User,V.Caller.CompanyCode,V.Local.iUserID)
+		
+	F.Data.DataView.Create("dtEmails","dvEmails",22)
+	F.Data.DataView.ToString("dtEmails","dvEmails","RECIPIENTNAME*!*EMAILADDR","*!*","@!@",V.Local.sRecipients)
+	
+	F.Global.Messaging.Queuemessage(V.Caller.CompanyCode,V.Local.iUserID,"","New Orders Have Been Created from RBRetail",V.Local.sSender,V.Local.sRecipients,V.Local.sBody)
+	
+	F.Data.DataView.Close("dtEmails","dvEmails")
+F.Intrinsic.Control.EndIf
+
+F.Data.DataTable.Close("dtEmails")
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SendEmails.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2}, {3}", V.Ambient.NewLine, V.Args.SubRoutine, V.Args.eNumber, V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date, V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+Program.Sub.Error.End
