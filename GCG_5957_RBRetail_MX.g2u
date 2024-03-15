@@ -1,0 +1,259 @@
+Program.Sub.ScreenSU.Start
+Gui.fmMX..Create
+Gui.fmMX..Caption("RB Retail Maintenance")
+Gui.fmMX..Size(7350,3435)
+Gui.fmMX..MinX(0)
+Gui.fmMX..MinY(0)
+Gui.fmMX..Position(0,0)
+Gui.fmMX..MousePointer(0)
+Gui.fmMX..Event(UnLoad,fmMX_UnLoad)
+Gui.fmMX..BackColor(12648384)
+Gui.fmMX.frameAPI.Create(Frame)
+Gui.fmMX.frameAPI.Size(7005,1170)
+Gui.fmMX.frameAPI.Position(75,105)
+Gui.fmMX.frameAPI.BorderStyle(3)
+Gui.fmMX.cmdSetAPI.Create(Button)
+Gui.fmMX.cmdSetAPI.Create(Button)
+Gui.fmMX.cmdSetAPI.Size(1470,300)
+Gui.fmMX.cmdSetAPI.Position(5460,750)
+Gui.fmMX.cmdSetAPI.Size(1470,300)
+Gui.fmMX.cmdSetAPI.Position(5400,720)
+Gui.fmMX.cmdSetAPI.Caption("Save")
+Gui.fmMX.cmdSetAPI.Parent("frameAPI")
+Gui.fmMX.cmdSetAPI.FontStyle(True,False,False,False,False)
+Gui.fmMX.cmdSetAPI.Event(Click,cmdSetAPI_Click)
+Gui.fmMX.txtAPIUsr.Create(TextBox,"",True,3630,300,0,2085,180,True,0,"Arial",8,-2147483643,1)
+Gui.fmMX.txtAPIUsr.Parent("frameAPI")
+Gui.fmMX.txtAPIUsr.TabStop(True)
+Gui.fmMX.txtAPIUsr.TabIndex(1)
+Gui.fmMX.lblAPI.Create(Label,"RB Retail Database",True,1650,255,0,150,270,True,0,"Arial",8,-2147483633,0)
+Gui.fmMX.lblAPI.Parent("frameAPI")
+Gui.fmMX.lblAPI.FontStyle(True,False,False,False,False)
+Gui.fmMX.txtLastOrd.Create(TextBox,"",True,1215,300,0,2085,555,True,0,"Arial",8,-2147483643,1)
+Gui.fmMX.txtLastOrd.Parent("frameAPI")
+Gui.fmMX.txtLastOrd.FontStyle(True,False,False,False,False)
+Gui.fmMX.lblLastOrd.Create(Label,"Last Order Received",True,1935,255,0,150,630,True,0,"Arial",8,-2147483633,0)
+Gui.fmMX.lblLastOrd.Parent("frameAPI")
+Gui.fmMX.lblLastOrd.FontStyle(True,False,False,False,False)
+Gui.fmMX.frameEmail.Create(Frame)
+Gui.fmMX.frameEmail.Size(7005,1530)
+Gui.fmMX.frameEmail.Position(75,1305)
+Gui.fmMX.frameEmail.BorderStyle(3)
+Gui.fmMX.lblSetEmails.Create(Label,"Set Email Recipients",True,3135,255,0,165,255,True,0,"Arial",8,-2147483633,0)
+Gui.fmMX.lblSetEmails.FontStyle(True,False,False,False,False)
+Gui.fmMX.lblSetEmails.Parent("frameEmail")
+Gui.fmMX.cmdSvEmail.Create(Button)
+Gui.fmMX.cmdSvEmail.Size(1470,300)
+Gui.fmMX.cmdSvEmail.Position(5460,1110)
+Gui.fmMX.cmdSvEmail.Caption("Save")
+Gui.fmMX.cmdSvEmail.FontStyle(True,False,False,False,False)
+Gui.fmMX.cmdSvEmail.Parent("frameEmail")
+Gui.fmMX.cmdSvEmail.Event(Click,cmdSvEmail_Click)
+Gui.fmMX.txtEmail.Create(TextBox,"",True,3135,300,0,975,885,True,0,"Arial",8,-2147483643,1)
+Gui.fmMX.txtEmail.Parent("frameEmail")
+Gui.fmMX.txtEmail.TabStop(True)
+Gui.fmMX.txtEmail.TabIndex(4)
+Gui.fmMX.lblEmail.Create(Label,"Email",True,765,255,0,165,945,True,0,"Arial",8,-2147483633,0)
+Gui.fmMX.lblEmail.Parent("frameEmail")
+Gui.fmMX.lblEmail.FontStyle(True,False,False,False,False)
+Gui.fmMX.lblRecipient.Create(Label,"Name",True,765,255,0,165,600,True,0,"Arial",8,-2147483633,0)
+Gui.fmMX.lblRecipient.Parent("frameEmail")
+Gui.fmMX.lblRecipient.FontStyle(True,False,False,False,False)
+Gui.fmMX.txtRecipient.Create(TextBox,"",True,3135,300,0,975,510,True,0,"Arial",8,-2147483643,1)
+Gui.fmMX.txtRecipient.Parent("frameEmail")
+Gui.fmMX.txtRecipient.TabStop(True)
+Gui.fmMX.txtRecipient.TabIndex(5)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+'TJS April 2020
+'Customer: Cardinal Systems
+'This is a maintenance program where the customer can store RB Retail server information, 
+'an email recipient, the last order received 
+'This information is used by  
+'GCG_5957_RBRetail_Imp.g2u
+'All data is stored as a single row in GCG_5957_MAINT 
+
+F.Intrinsic.Control.CallSub(SetIcon)
+F.Intrinsic.Control.CallSub(Data)
+
+Gui.fmMX..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Data.Start
+F.Intrinsic.Control.Try
+V.Local.sSQL.Declare
+V.Local.sCmdCap.Declare
+
+F.Intrinsic.Control.If(V.DataTable.dtEmails.Exists)
+	F.Data.DataTable.Close("dtEmails")
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+
+F.ODBC.Connection!conts.ExecuteAndReturn("select RB_DATABASE,LAST_ORD_REC,REC_NAME,REC_EMAIL from GCG_5957_MAINT where REC_ID = 1",V.Local.sSQL)
+F.Intrinsic.String.Split(V.Local.sSQL,"*!*",V.Local.sSQL)
+
+Gui.fmMX.txtAPIUsr.Text(V.Local.sSQL(0).Trim)
+Gui.fmMX.txtLastOrd.Text(V.Local.sSQL(1).Trim)
+Gui.fmMX.txtRecipient.Text(V.Local.sSQL(2).Trim)
+Gui.fmMX.txtEmail.Text(V.Local.sSQL(3).Trim)
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.Data.End
+
+Program.Sub.cmdGetAPI_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sSQL.Declare
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+
+F.ODBC.Connection!conts.ExecuteAndReturn("select RTRIM(RB_DATABASE) from GCG_5957_MAINT where REC_ID = 1",V.Local.sSQL)
+
+F.Intrinsic.Control.If(V.Local.sSQL.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("There are is no RB Retail database on file","Error")
+F.Intrinsic.Control.Else
+	Gui.fmMX.txtAPIUsr.Text(V.Local.sSQL.Trim)
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdGetAPI_Click.End
+
+Program.Sub.cmdSetAPI_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sRBServer.Declare
+V.Local.sAPIPASS.Declare
+V.Local.sSQL.Declare
+V.Local.iRET.Declare
+V.Local.sLastOrd.Declare
+
+F.Intrinsic.Control.If(V.Screen.fmMX!txtAPIUsr.Text.Trim,=,"")
+	F.Intrinsic.String.Build("This will delete any currently stored server.{0}Are you sure you wish to continue?",V.Ambient.NewLine,V.Local.sSQL)
+	F.Intrinsic.UI.Msgbox(V.Local.sSQL,"Warning!",4,V.Local.iRET)
+	F.Intrinsic.Control.If(V.Local.iRET,=,7)
+		F.Intrinsic.Control.ExitSub
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+V.Local.sRBServer.Set(V.Screen.fmMX!txtAPIUsr.Text.Trim)
+V.Local.sLastOrd.Set(V.Screen.fmMX!txtLastOrd.Text.Trim)
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+F.ODBC.Connection!conts.ExecuteAndReturn("select * from GCG_5957_MAINT where REC_ID = 1",V.Local.sSQL)
+F.Intrinsic.Control.If(V.Local.sSQL.Trim,=,"")
+	F.Intrinsic.String.Build("Insert into GCG_5957_MAINT (RB_DATABASE,LAST_ORD_REC) values('{0}','{1}')",V.Local.sRBServer.Trim,V.Local.sLastOrd.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("Update GCG_5957_MAINT set RB_DATABASE = '{0}',LAST_ORD_REC = '{1}' where REC_ID=1",V.Local.sRBServer.Trim,V.Local.sLastOrd.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdSetAPI_Click.End
+
+Program.Sub.cmdSvEmail_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sEmail.Declare
+V.Local.sName.Declare
+V.Local.bCheck.Declare
+V.Local.sSQL.Declare
+
+V.Local.sEmail.Set(V.Screen.fmMX!txtEmail.Text)
+V.Local.sName.Set(V.Screen.fmMX!txtRecipient.Text)
+
+F.Intrinsic.Control.If(V.Local.sEmail.Trim,=,"","OR",V.Local.sName.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("Please provide an email address and name","Error!")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Global.Messaging.IsAddressValid(V.Local.sEmail.Trim,V.Local.bCheck)
+F.Intrinsic.Control.If(v.Local.bCheck,=,False)
+	F.Intrinsic.UI.Msgbox("Email is not in the correct Format. Please enter a valid email address.")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.OpenCompanyConnection
+F.Intrinsic.String.Build("select * from GCG_5957_MAINT where  REC_ID = 1",V.Local.sEmail.Trim,V.Local.sSQL)
+F.ODBC.Connection!conts.ExecuteAndReturn(V.Local.sSQL,V.Local.sSQL)
+F.Intrinsic.Control.If(V.Local.sSQL.Trim,=,"")
+	F.Intrinsic.String.Build("Insert into GCG_5957_MAINT (REC_EMAIL,REC_NAME) values('{0}','{1}')",V.Local.sEmail.Trim,V.Local.sName.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+F.Intrinsic.Control.Else
+	F.Intrinsic.String.Build("Update GCG_5957_MAINT set REC_EMAIL='{0}',REC_NAME='{1}' where REC_ID = 1",V.Screen.fmMX!txtEmail.Text,V.Screen.fmMX!txtRecipient.Text,V.Local.sEmail.Trim,V.Local.sSQL)
+	F.ODBC.Connection!conts.Execute(V.Local.sSQL)
+F.Intrinsic.Control.EndIf
+
+F.ODBC.Connection!conts.Close
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdSvEmail_Click.End
+
+Program.Sub.SetIcon.Start
+F.Intrinsic.Control.Try
+V.Local.sForm.Declare
+V.Local.bExists.Declare
+V.Local.sIcon.Declare
+V.Local.iCounter.Declare
+
+F.Intrinsic.String.Build("{0}\ART\gss2.ico",V.Caller.GlobalDir,v.Local.sIcon)
+F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+F.Intrinsic.Control.If(V.Local.bExists.Not)
+    F.Intrinsic.String.Build("{0}\GAB\GAS\gss2.ico",V.Caller.PluginsDir,v.Local.sIcon)
+    F.Intrinsic.File.Exists(V.Local.sIcon, V.Local.bExists)
+    F.Intrinsic.Control.If(V.Local.bExists.Not)
+        F.Intrinsic.Control.ExitSub
+    F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.UI.GetFormList(V.Local.sForm)
+F.Intrinsic.String.Split(V.Local.sForm, "*!*", V.Local.sForm)
+
+F.Intrinsic.Control.For(V.Local.iCounter, 0, V.Local.sForm.UBound, 1)
+    Gui.[V.Local.sForm(V.Local.iCounter)]..Icon(V.Local.sIcon)
+F.Intrinsic.Control.Next(V.Local.iCounter)
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(Error,"SubRoutine",V.Ambient.CurrentSubroutine,"eNumber",V.Ambient.ErrorNumber,"eDescription",V.Ambient.ErrorDescription)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetIcon.End
+
+Program.Sub.fmMX_UnLoad.Start
+F.Intrinsic.Control.End
+Program.Sub.fmMX_UnLoad.End
+
+Program.Sub.Error.Start
+V.Local.sError.Declare
+V.Local.iRet.Declare
+V.Local.sSep.Declare
+
+F.Intrinsic.String.Build("-------------------------------------------------------------------------------------",,V.Local.sSep)
+F.Intrinsic.String.Build("({5}-{6}){0}{7}{0}Project: {4}{0}{7}{0}Sub: {1}{0}Error: {2},{3}",V.Ambient.NewLine,V.Args.SubRoutine,V.Args.eNumber,V.Args.eDescription,V.Caller.ScriptFile,V.Ambient.Date,V.Ambient.Time,V.Local.sSep,V.Local.sError)
+F.Intrinsic.UI.Msgbox(V.Local.sError,"Error",V.Local.iRet)
+F.Intrinsic.Control.CallSub(fmMX_UnLoad)
+Program.Sub.Error.End
